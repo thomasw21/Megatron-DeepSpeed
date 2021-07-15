@@ -21,6 +21,8 @@ import multiprocessing
 import os
 import sys
 import functools
+import resource
+import itertools
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir)))
 import time
@@ -151,6 +153,7 @@ def main():
 
     print("Opening", args.input)
     fin = open(args.input, 'r', encoding='utf-8')
+    fin = itertools.cycle(fin)
 
     if nltk_available and args.split_sentences:
         nltk.download("punkt", quiet=True)
@@ -162,7 +165,6 @@ def main():
     # Necessary to share a semaphore across processes
     m = multiprocessing.Manager()
     semaphore = m.Semaphore(args.max_sample_in_memory)
-
     # This helps prevent deadlock
     assert args.max_sample_in_memory >= args.workers * chunksize
 
@@ -203,6 +205,7 @@ def main():
                 builders[key].add_item(torch.IntTensor(sentence))
             builders[key].end_document()
         if i % args.log_interval == 0:
+            print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
             current = time.time()
             elapsed = current - proc_start
             mbs = total_bytes_processed/elapsed/1024/1024
