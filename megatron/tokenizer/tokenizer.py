@@ -20,7 +20,8 @@ from abc import abstractmethod
 
 from .bert_tokenization import FullTokenizer as FullBertTokenizer
 from .gpt2_tokenization import GPT2Tokenizer
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, PreTrainedTokenizerFast
+
 
 def build_tokenizer(args):
     """Initialize tokenizer."""
@@ -322,6 +323,8 @@ class _AutoTokenizer(AbstractTokenizer):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=use_fast)
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
+        self.batch_tokenize = self.tokenizer._tokenizer.encode(batch)if isinstance(tokenizer, PreTrainedTokenizerFast) else
+        lambda texts: self.tokenizer.batch_encode_plus(texts, return_attention_mask=False)["input_ids"]
 
     @property
     def vocab_size(self):
@@ -339,7 +342,10 @@ class _AutoTokenizer(AbstractTokenizer):
         return self.tokenizer.encode(text)
 
     def batch_tokenize(self, texts):
-        return self.tokenizer.batch_encode_plus(texts, return_attention_mask=False)["input_ids"]
+        if isinstance(self.tokenizer, PreTrainedTokenizerFast):
+            return [encoding.ids for encoding in self.tokenizer._tokenizer.encode_batch(texts)]
+        else:
+            return super(_AutoTokenizer, self).batch_tokenize(texts)
 
     def detokenize(self, token_ids):
         return self.tokenizer.decode(token_ids)
