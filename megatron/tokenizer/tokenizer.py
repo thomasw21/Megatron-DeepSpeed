@@ -104,6 +104,14 @@ class AbstractTokenizer(ABC):
     def tokenize(self, text):
         pass
 
+    @abstractmethod
+    def batch_tokenize(self, texts):
+        """Naive implementation of batched tokenization"""
+        tokenized_texts = []
+        for text in texts:
+            tokenized_texts.append(self.tokenize(text))
+        return tokenized_texts
+
     def detokenize(self, token_ids):
         raise NotImplementedError('detokenizer is not implemented for {} '
                                   'tokenizer'.format(self.name))
@@ -195,6 +203,9 @@ class _BertWordPieceTokenizer(AbstractTokenizer):
     def tokenize(self, text):
         text_tokens = self.tokenizer.tokenize(text)
         return self.tokenizer.convert_tokens_to_ids(text_tokens)
+    
+    def batch_tokenize(self, texts):
+        return super(_BertWordPieceTokenizer, self).batch_tokenize(texts)
 
     def decode(self, ids):
         tokens = self.tokenizer.convert_ids_to_tokens(ids)
@@ -291,6 +302,9 @@ class _GPT2BPETokenizer(AbstractTokenizer):
     def tokenize(self, text):
         return self.tokenizer.encode(text)
 
+    def batch_tokenize(self, texts):
+        return super(_GPT2BPETokenizer, self).batch_tokenize(texts)
+
     def detokenize(self, token_ids):
         return self.tokenizer.decode(token_ids)
 
@@ -323,6 +337,9 @@ class _AutoTokenizer(AbstractTokenizer):
 
     def tokenize(self, text):
         return self.tokenizer.encode(text)
+
+    def batch_tokenize(self, texts):
+        return self.tokenizer.encode(texts)
 
     def detokenize(self, token_ids):
         return self.tokenizer.decode(token_ids)
