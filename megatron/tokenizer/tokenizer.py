@@ -323,8 +323,6 @@ class _AutoTokenizer(AbstractTokenizer):
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, use_fast=use_fast)
         self.encoder = self.tokenizer.get_vocab()
         self.decoder = {v: k for k, v in self.encoder.items()}
-        self.batch_tokenize = self.tokenizer._tokenizer.encode(batch)if isinstance(tokenizer, PreTrainedTokenizerFast) else
-        lambda texts: self.tokenizer.batch_encode_plus(texts, return_attention_mask=False)["input_ids"]
 
     @property
     def vocab_size(self):
