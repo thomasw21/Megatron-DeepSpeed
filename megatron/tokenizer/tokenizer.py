@@ -339,7 +339,7 @@ class _AutoTokenizer(AbstractTokenizer):
         return self.tokenizer.encode(text)
 
     def batch_tokenize(self, texts):
-        return self.tokenizer.encode(texts)
+        return self.tokenizer.batch_encode_plus(texts)["input_ids"]
 
     def detokenize(self, token_ids):
         return self.tokenizer.decode(token_ids)
