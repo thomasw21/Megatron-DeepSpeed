@@ -63,6 +63,7 @@ class Encoder(object):
     def __init__(self, args):
         self.json_keys = args.json_keys
         self.append_eod = args.append_eod
+        self.file = open(args.input, 'r')
         # Use Encoder class as a container for global data
         self.tokenizer = build_tokenizer(args)
         if args.split_sentences:
@@ -96,6 +97,12 @@ class Encoder(object):
             ids[key] = doc_ids
         return ids, len(json_line)
 
+    def get_json_lines(self, chunk_segment):
+        # We know chunk_segment represents a few lines
+        start, end = chunk_segment
+        self.file.seek(start)
+        return self.file.readlines(end-start)
+
 
 def process_samples(simple_queue, process_id, args, level, writer: Connection):
     encoder = Encoder(args)
@@ -111,11 +118,11 @@ def process_samples(simple_queue, process_id, args, level, writer: Connection):
                                                      impl=args.dataset_impl,
                                                      vocab_size=encoder.tokenizer.vocab_size)
 
-    json_lines = simple_queue.get()
-    while json_lines is not None:
-        process_json_lines(json_lines, encoder, builders, writer)
+    chunk_segment = simple_queue.get()
+    while chunk_segment is not None:
+        process_chunk_segment(chunk_segment, encoder, builders, writer)
 
-        json_lines = simple_queue.get()
+        chunk_segment = simple_queue.get()
 
     # In case finished, we still need to add None to signal to everyone else
     simple_queue.put(None)
@@ -129,8 +136,9 @@ def process_samples(simple_queue, process_id, args, level, writer: Connection):
     print(f"Worker {process_id} finished", flush=True)
 
 
-def process_json_lines(json_lines, encoder, builders, writer):
+def process_chunk_segment(chunk_segment, encoder, builders, writer):
     total_bytes_processed = 0
+    json_lines = encoder.get_json_lines(chunk_segment)
     for json_line in json_lines:
         if json_line.strip() == "":
             continue
@@ -205,13 +213,16 @@ def fill_simple_queue(filename, simple_queue, chunk_size:int):
     # TODO: Assess if instead we could feed pointers which process can then load.
     with open(filename, "r") as f:
         print("Start filling queue", flush=True)
+        start = f.tell()
         while True:
             acc = tuple(itertools.islice(f, chunk_size))
             if len(acc) == 0:
                 simple_queue.put(None)
                 print(f"Finished reading input file", flush=True)
                 return
-            simple_queue.put(acc)
+            end = f.tell()
+            simple_queue.put((start, end))
+            start = end
 
 def log(readers, log_interval):
     print("Start Logging", flush=True)
