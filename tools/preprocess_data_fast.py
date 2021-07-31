@@ -215,8 +215,13 @@ def fill_simple_queue(filename, simple_queue, chunk_size:int):
         print("Start filling queue", flush=True)
         start = f.tell()
         while True:
-            acc = tuple(itertools.islice(f, chunk_size))
-            if len(acc) == 0:
+            empty_chunk = True
+            for _ in range(chunk_size):
+                line = f.readline()
+                if line == "":
+                    break
+                empty_chunk = False
+            if empty_chunk:
                 simple_queue.put(None)
                 print(f"Finished reading input file", flush=True)
                 return
