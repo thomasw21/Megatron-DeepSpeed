@@ -60,9 +60,10 @@ class IdentitySplitter(object):
         return text
 
 class Encoder(object):
-    def __init__(self, args):
+    def __init__(self, args, chunk_size):
         self.json_keys = args.json_keys
         self.append_eod = args.append_eod
+        self.chunk_size = chunk_size
         self.file = open(args.input, 'r')
         # Use Encoder class as a container for global data
         self.tokenizer = build_tokenizer(args)
@@ -97,15 +98,14 @@ class Encoder(object):
             ids[key] = doc_ids
         return ids, len(json_line)
 
-    def get_json_lines(self, chunk_segment):
+    def get_json_lines(self, start_cursor):
         # We know chunk_segment represents a few lines
-        start, end = chunk_segment
-        self.file.seek(start)
-        return self.file.readlines(end-start)
+        self.file.seek(start_cursor)
+        return tuple(itertools.islice(self.file, self.chunk_size))
 
 
-def process_samples(simple_queue, process_id, args, level, writer: Connection):
-    encoder = Encoder(args)
+def process_samples(simple_queue, process_id, args, level, chunk_size, writer: Connection):
+    encoder = Encoder(args, chunk_size)
 
     output_bin_files = {}
     output_idx_files = {}
@@ -118,11 +118,11 @@ def process_samples(simple_queue, process_id, args, level, writer: Connection):
                                                      impl=args.dataset_impl,
                                                      vocab_size=encoder.tokenizer.vocab_size)
 
-    chunk_segment = simple_queue.get()
-    while chunk_segment is not None:
-        process_chunk_segment(chunk_segment, encoder, builders, writer)
+    start_cursor = simple_queue.get()
+    while start_cursor is not None:
+        process_chunk_segment(start_cursor, encoder, builders, writer)
 
-        chunk_segment = simple_queue.get()
+        start_cursor = simple_queue.get()
 
     # In case finished, we still need to add None to signal to everyone else
     simple_queue.put(None)
@@ -136,9 +136,9 @@ def process_samples(simple_queue, process_id, args, level, writer: Connection):
     print(f"Worker {process_id} finished", flush=True)
 
 
-def process_chunk_segment(chunk_segment, encoder, builders, writer):
+def process_chunk_segment(start_cursor, encoder, builders, writer):
     total_bytes_processed = 0
-    json_lines = encoder.get_json_lines(chunk_segment)
+    json_lines = encoder.get_json_lines(start_cursor)
     for json_line in json_lines:
         if json_line.strip() == "":
             continue
@@ -213,8 +213,8 @@ def fill_simple_queue(filename, simple_queue, chunk_size:int):
     # TODO: Assess if instead we could feed pointers which process can then load.
     with open(filename, "r") as f:
         print("Start filling queue", flush=True)
-        start = f.tell()
         while True:
+            start = f.tell()
             empty_chunk = True
             for _ in range(chunk_size):
                 line = f.readline()
@@ -225,9 +225,7 @@ def fill_simple_queue(filename, simple_queue, chunk_size:int):
                 simple_queue.put(None)
                 print(f"Finished reading input file", flush=True)
                 return
-            end = f.tell()
-            simple_queue.put((start, end))
-            start = end
+            simple_queue.put(start)
 
 def log(readers, log_interval):
     print("Start Logging", flush=True)
@@ -295,7 +293,7 @@ def main():
     assert args.workers > 1, "One for filling the queue"
     readers, writers = list(zip(*[multiprocessing.Pipe(duplex=False) for _ in range(args.workers - 1)]))
     process_ids = list(range(len(writers)))
-    processes = [multiprocessing.Process(target=process_samples, args=(simple_queue, process_id, args, level, writer)) for process_id, writer in zip(process_ids, writers)]
+    processes = [multiprocessing.Process(target=process_samples, args=(simple_queue, process_id, args, level, chunk_size, writer)) for process_id, writer in zip(process_ids, writers)]
     log_thread = threading.Thread(target=log, args=(list(readers), args.log_interval))
     fill_thread = multiprocessing.Process(target=fill_simple_queue, args=(args.input, simple_queue, chunk_size))
 
