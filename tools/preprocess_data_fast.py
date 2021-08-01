@@ -18,7 +18,7 @@
 import argparse
 import collections
 import itertools
-import json
+import ujson as json
 import multiprocessing
 import os
 import sys
