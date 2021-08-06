@@ -62,7 +62,7 @@ def flatten_arguments(args):
 
     Example: {"arg1": "value1", "arg2": "value2"} -> ["IGNORED", "arg1", "value1", "arg2", "value2"]
     """
-    return ["IGNORED"] + [item for key_value in args.items() for item in key_value]
+    return ["IGNORED"] + [item for key_value in args.items() for item in key_value if item != ""]
 
 class MyTestCase(unittest.TestCase):
     def test_gpt_causal(self):
