@@ -87,24 +87,35 @@ class MyTestCase(unittest.TestCase):
             # process batch
             input_batch = get_gpt_batch_pipe(token_ids)[0]
 
-            # get a modified version of the first batch
+            # get a modified version of the first batch, we change a specific index
             changed_index = randint(0, args.seq_length - 2)
             input_token_ids_changed = input_batch[0].clone()
-            # We randomly increment the index by one of that index
-            input_token_ids_changed[changed_index] = (input_token_ids_changed[changed_index] + 1) % args.padded_vocab_size
+            # We increment the token_id by one for that index in order to artificially change the sequence.
+            input_token_ids_changed[changed_index] = (input_token_ids_changed[:, changed_index] + 1) % args.padded_vocab_size
 
             output = model_engine(input_batch)
             output_changed = model_engine((input_token_ids_changed, *input_batch[1:]))
 
             # All token in past should be unchanged
-            self.assertEqual(output[:, :changed_index], output_changed[:, :changed_index])
+            self.assertTrue(
+                torch.all(
+                    output[:, :changed_index].eq(output_changed[:, :changed_index])
+                )
+            )
+            # All tokens in the future should have changed
+            self.assertFalse(
+                torch.any(
+                    output[:, changed_index:].eq(output_changed[:, changed_index:])
+                )
+            )
 
 
     def test_gpt_prefix(self):
         """
         Test prefix invariances:
-            - Past tokens in the target don't depend on future tokens.
-            - Input tokens
+            - Past target tokens don't depend on future target tokens.
+            - Target tokens depend on input tokens.
+            - Input tokens depend on all other input tokens, but never target tokens.
         """
         command_args = get_default_args()
 
@@ -120,25 +131,79 @@ class MyTestCase(unittest.TestCase):
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
-            # eod is a special token
+            # eod is a special token, this also guarantees that the whole row is considered as a document.
             token_ids[token_ids == tokenizer.eod] += 1
             token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
-            # process batch
-            input_batch, _, prefix_indices = get_prefix_lm_batch_pipe(token_ids)
-
-            # get a modified version of the first batch
-            changed_index = randint(0, args.seq_length - 2)
-            input_token_ids_changed = input_batch[0].clone()
-            # We randomly increment the index by one of that index
-            input_token_ids_changed[changed_index] = (input_token_ids_changed[
-                                                          changed_index] + 1) % args.padded_vocab_size
+            # process batch to have non empty prefix
+            for i in range(9, -1, -1):
+                input_batch, _, prefix_indices = get_prefix_lm_batch_pipe(token_ids)
+                if (prefix_indices[0][0] != 0):
+                    break
+                if i == 0:
+                    # FIXME: find a better way to not obtain empty prefix
+                    raise ValueError("Could not obtain non pathological case where prefix is not empty")
 
             output = model_engine(input_batch)
-            output_changed = model_engine((input_token_ids_changed, *input_batch[1:]))
+
+            ## --------------- CHANGE A TARGET TOKEN ---------------------------
+            # get a modified version of the first batch
+            changed_target_index = prefix_indices[0][0] # guaranteed to exist as each row has at least one partial document
+            token_ids_changed_target = input_batch[0].clone()
+            # We increment the token id on the changed index.
+            token_ids_changed_target[changed_target_index] = (token_ids_changed_target[0, changed_target_index] + 1) % args.padded_vocab_size
+            # make sure we're not changing a token to eod as it's a special token
+            token_ids_changed_target[token_ids_changed_target == tokenizer.eod] += 1
+            token_ids_changed_target[token_ids_changed_target == tokenizer.eod] %= args.padded_vocab_size
+
+            # Test change
+            output_changed_target = model_engine((token_ids_changed_target, *input_batch[1:]))
 
             # All token in past should be unchanged
-            self.assertEqual(output[:, :changed_index], output_changed[:, :changed_index])
+            self.assertTrue(
+                torch.all(
+                    output[0, :changed_target_index].eq(output_changed_target[0, :changed_target_index])
+                )
+            )
+            # All tokens in the future should have changed
+            self.assertFalse(
+                torch.any(
+                    output[0, changed_target_index:].eq(output_changed_target[0, changed_target_index:])
+                )
+            )
+            # Unchanged changed rows should not change either
+            self.assertTrue(
+                torch.all(
+                    output[1, :].eq(output_changed_target[1, :])
+                )
+            )
+
+            ## --------------- CHANGE AN INPUT TOKEN ---------------------------
+            # Let's change the the last prefix token and make sure that the first token changed
+            last_prefix_index = prefix_indices[0][0] - 1  # guaranteed to be positive as we avoid pathological case previously
+            token_ids_changed_input = input_batch[0].clone()
+            #  We increment the token id on the changed index.
+            token_ids_changed_input[changed_target_index] = (token_ids_changed_input[
+                                                                 0, last_prefix_index] + 1) % args.padded_vocab_size
+            # make sure we're not changing a token to eod as it's a special token
+            token_ids_changed_input[token_ids_changed_input == tokenizer.eod] += 1
+            token_ids_changed_input[token_ids_changed_input == tokenizer.eod] %= args.padded_vocab_size
+
+            output_changed_input = model_engine((token_ids_changed_input, *input_batch[1:]))
+
+            # All tokens should be changed
+            self.assertFalse(
+                torch.any(
+                    output[0, :].eq(output_changed_input[0, :])
+                )
+            )
+            # Unchanged changed rows should not change either
+            self.assertTrue(
+                torch.all(
+                    output[1, :].eq(output_changed_input[1, :])
+                )
+            )
+
 
     def test_gpt_rotary_embeddings(self):
         """Test rotary embeddings"""
