@@ -11,12 +11,6 @@ from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_b
 
 def get_default_args():
     """return a dictionary with key as argument name and value as additional arguments"""
-    VOCAB_FILE=""
-    MERGE_FILE=""
-
-    CHECKPOINT_PATH=""
-    DATA_PATH=""
-
     return {
         # GPT_ARGS
         "--num-layers": "2",
@@ -31,8 +25,8 @@ def get_default_args():
         "--lr": "0.00015",
         "--min-lr": "1.0e-5",
         "--train-iters": "5000",
-        "--vocab-file": VOCAB_FILE,
-        "--merge-file": MERGE_FILE,
+        "--tokenizer": "PretrainedFromHF",
+        "--tokenizer-name-or-path": "gpt2",
         "--data-impl": "mmap",
         "--split": "949,50,1",
         "--distributed-backend": "nccl",
@@ -49,9 +43,6 @@ def get_default_args():
         "--checkpoint-activations": "",
 
         # DATA_ARGS
-        "--save": CHECKPOINT_PATH,
-        "--load": CHECKPOINT_PATH,
-        "--data-path": DATA_PATH,
     }
 
 def flatten_arguments(args):
