@@ -19,9 +19,6 @@ def get_default_args():
     DATA_PATH=""
 
     return {
-        # Deepspeed
-        "--deepspeed": "",
-
         # GPT_ARGS
         "--num-layers": "2",
         "--hidden-size": "128",
