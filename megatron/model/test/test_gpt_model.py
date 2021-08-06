@@ -6,7 +6,6 @@ import torch
 from deepspeed import deepspeed
 
 from megatron import initialize_megatron, get_args, get_tokenizer
-from megatron.model import GPTModelPipe
 from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
 from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_batch_pipe as get_prefix_lm_batch_pipe
 
@@ -57,11 +56,13 @@ def get_default_args():
 
 def flatten_arguments(args):
     """
-    Converts dictionary argument to a list
+    Converts dictionary argument to a list.
 
-    Example: {"arg1": "value1", "arg2": "value2"} -> ["arg1", "value1", "arg2", "value2"]
+    Note: we add "IGNORED" at the beginning as this value is ignored by the argparser
+
+    Example: {"arg1": "value1", "arg2": "value2"} -> ["IGNORED", "arg1", "value1", "arg2", "value2"]
     """
-    return [item for key_value in args.items() for item in key_value]
+    return ["IGNORED"] + [item for key_value in args.items() for item in key_value]
 
 class MyTestCase(unittest.TestCase):
     def test_gpt_causal(self):
