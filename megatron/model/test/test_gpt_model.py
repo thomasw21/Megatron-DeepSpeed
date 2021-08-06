@@ -3,11 +3,12 @@ from random import randint
 from unittest.mock import patch
 
 import torch
+from deepspeed import deepspeed
 
 from megatron import initialize_megatron, get_args, get_tokenizer
 from megatron.model import GPTModelPipe
-from pretrain_gpt import get_batch_pipe
-
+from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
+from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_batch_pipe as get_prefix_lm_batch_pipe
 
 def get_default_args():
     """return a dictionary with key as argument name and value as additional arguments"""
@@ -75,10 +76,7 @@ class MyTestCase(unittest.TestCase):
             args = get_args()
             tokenizer = get_tokenizer()
 
-            model = GPTModelPipe(
-                num_tokentypes=0,
-                parallel_output=True,
-            )
+            model_engine = deepspeed.init_inference(gpt_model_provider())
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
@@ -86,28 +84,28 @@ class MyTestCase(unittest.TestCase):
             token_ids[token_ids == tokenizer.eod] += 1
             token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
-            # we set a variation on the inputs
-            changed_index = randint(0, args.seq_length - 1)
-            token_ids_changed = token_ids.clone()
-            token_ids_changed[changed_index] = (token_ids_changed[changed_index] + 1) % args.padded_vocab_size
+            # process batch
+            input_batch = get_gpt_batch_pipe(token_ids)[0]
 
-            model.forward()[get_batch_pipe(token_ids)]
+            # get a modified version of the first batch
+            changed_index = randint(0, args.seq_length - 2)
+            input_token_ids_changed = input_batch[0].clone()
+            # We randomly increment the index by one of that index
+            input_token_ids_changed[changed_index] = (input_token_ids_changed[changed_index] + 1) % args.padded_vocab_size
 
-            position_ids = torch.arange(args.seq_length).unsqueeze(0)
-            attention_mask = torch.ones((args.micro_batch_size, 1, args.seq_length, args.seq_length))
-
-            output = model(input_ids, position_ids, attention_mask)[0]
-
-
-
-            output_changed = model(input_ids_changed, position_ids, attention_mask)[0]
+            output = model_engine(input_batch)
+            output_changed = model_engine((input_token_ids_changed, *input_batch[1:]))
 
             # All token in past should be unchanged
             self.assertEqual(output[:, :changed_index], output_changed[:, :changed_index])
 
 
     def test_gpt_prefix(self):
-        """Test prefix invariance, ie past tokens in the target don't depend on future tokens."""
+        """
+        Test prefix invariances:
+            - Past tokens in the target don't depend on future tokens.
+            - Input tokens
+        """
         command_args = get_default_args()
 
         command_args["--prefix-lm"] = "",
@@ -116,25 +114,28 @@ class MyTestCase(unittest.TestCase):
         with patch('sys.argv', flatten_arguments(command_args)):
             initialize_megatron()
             args = get_args()
+            tokenizer = get_tokenizer()
 
-            model = GPTModelPipe(
-                num_tokentypes=0,
-                parallel_output=True,
-                pre_process=True,
-                post_process=True
-            )
+            model_engine = deepspeed.init_inference(prefix_lm_model_provider())
 
-            input_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
-            position_ids = torch.arange(args.seq_length).unsqueeze(0)
-            attention_mask = torch.ones((args.micro_batch_size, 1, args.seq_length, args.seq_length))
+            token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
-            output = model(input_ids, position_ids, attention_mask)[0]
+            # eod is a special token
+            token_ids[token_ids == tokenizer.eod] += 1
+            token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
-            changed_index = randint(0, args.seq_length - 1)
-            input_ids_changed = input_ids.clone()
-            input_ids_changed[changed_index] = (input_ids_changed[changed_index] + 1) % args.padded_vocab_size
+            # process batch
+            input_batch, _, prefix_indices = get_prefix_lm_batch_pipe(token_ids)
 
-            output_changed = model(input_ids_changed, position_ids, attention_mask)[0]
+            # get a modified version of the first batch
+            changed_index = randint(0, args.seq_length - 2)
+            input_token_ids_changed = input_batch[0].clone()
+            # We randomly increment the index by one of that index
+            input_token_ids_changed[changed_index] = (input_token_ids_changed[
+                                                          changed_index] + 1) % args.padded_vocab_size
+
+            output = model_engine(input_batch)
+            output_changed = model_engine((input_token_ids_changed, *input_batch[1:]))
 
             # All token in past should be unchanged
             self.assertEqual(output[:, :changed_index], output_changed[:, :changed_index])
@@ -149,29 +150,20 @@ class MyTestCase(unittest.TestCase):
         with patch('sys.argv', flatten_arguments(command_args)):
             initialize_megatron()
             args = get_args()
+            tokenizer = get_tokenizer()
 
-            model = GPTModelPipe(
-                num_tokentypes=0,
-                parallel_output=True,
-                pre_process=True,
-                post_process=True
-            )
+            model_engine = deepspeed.init_inference(gpt_model_provider())
 
-            input_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
-            position_ids = torch.arange(args.seq_length).unsqueeze(0)
-            attention_mask = torch.ones((args.micro_batch_size, 1, args.seq_length, args.seq_length))
+            token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
-            output = model(input_ids, position_ids, attention_mask)[0]
+            # eod is a special token
+            token_ids[token_ids == tokenizer.eod] += 1
+            token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
-            changed_index = randint(0, args.seq_length - 1)
-            input_ids_changed = input_ids.clone()
-            input_ids_changed[changed_index] = (input_ids_changed[changed_index] + 1) % args.padded_vocab_size
+            # process batch
+            input_batch = get_gpt_batch_pipe(token_ids)[0]
 
-            output_changed = model(input_ids_changed, position_ids, attention_mask)[0]
-
-            # All token in past should be unchanged
-            self.assertEqual(output[:, :changed_index], output_changed[:, :changed_index])
-
+            model_engine(input_batch)
 
 if __name__ == '__main__':
     unittest.main()
