@@ -56,6 +56,25 @@ def flatten_arguments(args):
     return ["IGNORED"] + [item for key_value in args.items() for item in key_value if item != ""]
 
 class MyTestCase(unittest.TestCase):
+    def setUpClass(cls) -> None:
+        deepspeed.init_distributed()
+
+    def tearDown(self) -> None:
+        # We reset all global variables
+        global _GLOBAL_ARGS
+        global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
+        global _GLOBAL_TOKENIZER
+        global _GLOBAL_TENSORBOARD_WRITER
+        global _GLOBAL_ADLR_AUTORESUME
+        global _GLOBAL_TIMERS
+
+        _GLOBAL_ARGS = None
+        _GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
+        _GLOBAL_TOKENIZER = None
+        _GLOBAL_TENSORBOARD_WRITER = None
+        _GLOBAL_ADLR_AUTORESUME = None
+        _GLOBAL_TIMERS = None
+
     def test_gpt_causal(self):
         """Test causal invariance, ie past token don't depend on future tokens."""
         command_args = get_default_args()
