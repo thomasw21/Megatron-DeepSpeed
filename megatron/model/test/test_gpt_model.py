@@ -56,7 +56,8 @@ def flatten_arguments(args):
     return ["IGNORED"] + [item for key_value in args.items() for item in key_value if item != ""]
 
 class MyTestCase(unittest.TestCase):
-    def setUpClass(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         deepspeed.init_distributed()
 
     def tearDown(self) -> None:
