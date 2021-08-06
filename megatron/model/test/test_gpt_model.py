@@ -25,7 +25,7 @@ def get_default_args():
         "--lr": "0.00015",
         "--min-lr": "1.0e-5",
         "--train-iters": "5000",
-        "--tokenizer": "PretrainedFromHF",
+        "--tokenizer-type": "PretrainedFromHF",
         "--tokenizer-name-or-path": "gpt2",
         "--data-impl": "mmap",
         "--split": "949,50,1",
