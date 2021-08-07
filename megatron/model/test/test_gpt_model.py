@@ -101,8 +101,8 @@ class MyTestCase(unittest.TestCase):
             # We increment the token_id by one for that index in order to artificially change the sequence.
             input_token_ids_changed[:, changed_index] = (input_token_ids_changed[:, changed_index] + 1) % args.padded_vocab_size
 
-            output = model(input_batch)
-            output_changed = model((input_token_ids_changed, *input_batch[1:]))
+            output = model(*input_batch)
+            output_changed = model(input_token_ids_changed, *input_batch[1:])
 
             # All token in past should be unchanged
             self.assertTrue(
@@ -153,7 +153,7 @@ class MyTestCase(unittest.TestCase):
                     # FIXME: find a better way to not obtain empty prefix
                     raise ValueError("Could not obtain non pathological case where prefix is not empty")
 
-            output = model(input_batch)
+            output = model(*input_batch)
 
             ## --------------- CHANGE A TARGET TOKEN ---------------------------
             # get a modified version of the first batch
@@ -166,7 +166,7 @@ class MyTestCase(unittest.TestCase):
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] %= args.padded_vocab_size
 
             # Test change
-            output_changed_target = model((token_ids_changed_target, *input_batch[1:]))
+            output_changed_target = model(token_ids_changed_target, *input_batch[1:])
 
             # All token in past should be unchanged
             self.assertTrue(
@@ -198,7 +198,7 @@ class MyTestCase(unittest.TestCase):
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] += 1
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] %= args.padded_vocab_size
 
-            output_changed_input = model((token_ids_changed_input, *input_batch[1:]))
+            output_changed_input = model(token_ids_changed_input, *input_batch[1:])
 
             # All tokens should be changed
             self.assertFalse(
@@ -238,7 +238,7 @@ class MyTestCase(unittest.TestCase):
             # process batch
             input_batch = get_gpt_batch_pipe({"text": token_ids})[0]
 
-            model(input_batch)
+            model(*input_batch)
 
 def get_deepspeed_args():
     parser = argparse.ArgumentParser()
