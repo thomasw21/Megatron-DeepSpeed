@@ -6,7 +6,7 @@ from unittest.mock import patch
 import deepspeed
 import torch
 
-from megatron import initialize_megatron, get_args, get_tokenizer
+from megatron import initialize_megatron, get_args, get_tokenizer, global_vars
 from megatron.training import setup_model_and_optimizer
 from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
 from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_batch_pipe as get_prefix_lm_batch_pipe
@@ -64,19 +64,12 @@ class MyTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         # We reset all global variables
-        global _GLOBAL_ARGS
-        global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
-        global _GLOBAL_TOKENIZER
-        global _GLOBAL_TENSORBOARD_WRITER
-        global _GLOBAL_ADLR_AUTORESUME
-        global _GLOBAL_TIMERS
-
-        _GLOBAL_ARGS = None
-        _GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
-        _GLOBAL_TOKENIZER = None
-        _GLOBAL_TENSORBOARD_WRITER = None
-        _GLOBAL_ADLR_AUTORESUME = None
-        _GLOBAL_TIMERS = None
+        global_vars._GLOBAL_ARGS = None
+        global_vars._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
+        global_vars._GLOBAL_TOKENIZER = None
+        global_vars._GLOBAL_TENSORBOARD_WRITER = None
+        global_vars._GLOBAL_ADLR_AUTORESUME = None
+        global_vars._GLOBAL_TIMERS = None
 
     def test_gpt_causal(self):
         """Test causal invariance, ie past token don't depend on future tokens."""
@@ -96,7 +89,7 @@ class MyTestCase(unittest.TestCase):
             token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
             # process batch
-            input_batch = get_gpt_batch_pipe(token_ids)[0]
+            input_batch = get_gpt_batch_pipe({"text": token_ids})[0]
 
             # get a modified version of the first batch, we change a specific index
             changed_index = randint(0, args.seq_length - 2)
@@ -104,8 +97,8 @@ class MyTestCase(unittest.TestCase):
             # We increment the token_id by one for that index in order to artificially change the sequence.
             input_token_ids_changed[changed_index] = (input_token_ids_changed[:, changed_index] + 1) % args.padded_vocab_size
 
-            output = model_engine(input_batch)
-            output_changed = model_engine((input_token_ids_changed, *input_batch[1:]))
+            output = model(input_batch)
+            output_changed = model((input_token_ids_changed, *input_batch[1:]))
 
             # All token in past should be unchanged
             self.assertTrue(
