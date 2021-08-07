@@ -1,3 +1,4 @@
+import argparse
 import unittest
 from random import randint
 from unittest.mock import patch
@@ -6,6 +7,7 @@ import deepspeed
 import torch
 
 from megatron import initialize_megatron, get_args, get_tokenizer
+from megatron.training import setup_model_and_optimizer
 from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
 from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_batch_pipe as get_prefix_lm_batch_pipe
 
@@ -85,7 +87,7 @@ class MyTestCase(unittest.TestCase):
             args = get_args()
             tokenizer = get_tokenizer()
 
-            model_engine = deepspeed.init_inference(gpt_model_provider())
+            model, _, _ = setup_model_and_optimizer(gpt_model_provider)
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
@@ -239,5 +241,10 @@ class MyTestCase(unittest.TestCase):
 
             model_engine(input_batch)
 
+def get_deepspeed_args():
+    parser = argparse.ArgumentParser()
+    return deepspeed.add_config_arguments(parser)
+
 if __name__ == '__main__':
+    get_deepspeed_args()
     unittest.main()
