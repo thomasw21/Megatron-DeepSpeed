@@ -60,6 +60,10 @@ def flatten_arguments(args):
     """
     return ["IGNORED"] + [item for key_value in args.items() for item in key_value if item != ""]
 
+def equal_vectors(tensor1, tensor2, dim = -1):
+    """View tensor1 and tensor2 as a list of vectors, and compute equality"""
+    return torch.linalg.norm(tensor1 - tensor2, dim=dim) == 0
+
 class MyTestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -106,19 +110,11 @@ class MyTestCase(unittest.TestCase):
 
             # All token in past should be unchanged
             self.assertTrue(
-                torch.all(
-                    output[:, :changed_index].eq(output_changed[:, :changed_index])
-                )
+                torch.all(equal_vectors(output[:, :changed_index], output_changed[:, :changed_index]))
             )
             # All tokens in the future should have changed
-            print(torch.any(
-                    output[:, changed_index:].eq(output_changed[:, changed_index:])
-                )
-            )
             self.assertFalse(
-                torch.any(
-                    output[:, changed_index:].eq(output_changed[:, changed_index:])
-                )
+                torch.any(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             )
 
 
@@ -175,19 +171,19 @@ class MyTestCase(unittest.TestCase):
             # All token in past should be unchanged
             self.assertTrue(
                 torch.all(
-                    output[0, :changed_target_index].eq(output_changed_target[0, :changed_target_index])
+                    equal_vectors(output[0, :changed_target_index], output_changed_target[0, :changed_target_index])
                 )
             )
             # All tokens in the future should have changed
             self.assertFalse(
                 torch.any(
-                    output[0, changed_target_index:].eq(output_changed_target[0, changed_target_index:])
+                    equal_vectors(output[0, changed_target_index:], output_changed_target[0, changed_target_index:])
                 )
             )
             # Unchanged changed rows should not change either
             self.assertTrue(
                 torch.all(
-                    output[1, :].eq(output_changed_target[1, :])
+                    equal_vectors(output[1, :], output_changed_target[1, :])
                 )
             )
 
@@ -207,13 +203,13 @@ class MyTestCase(unittest.TestCase):
             # All tokens should be changed
             self.assertFalse(
                 torch.any(
-                    output[0, :].eq(output_changed_input[0, :])
+                    equal_vectors(output[0, :], output_changed_input[0, :])
                 )
             )
             # Unchanged changed rows should not change either
             self.assertTrue(
                 torch.all(
-                    output[1, :].eq(output_changed_input[1, :])
+                    equal_vectors(output[1, :], output_changed_input[1, :])
                 )
             )
 
