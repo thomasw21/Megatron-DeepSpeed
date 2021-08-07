@@ -111,6 +111,10 @@ class MyTestCase(unittest.TestCase):
                 )
             )
             # All tokens in the future should have changed
+            print(torch.any(
+                    output[:, changed_index:].eq(output_changed[:, changed_index:])
+                )
+            )
             self.assertFalse(
                 torch.any(
                     output[:, changed_index:].eq(output_changed[:, changed_index:])
@@ -160,7 +164,7 @@ class MyTestCase(unittest.TestCase):
             changed_target_index = prefix_indices[0][0] # guaranteed to exist as each row has at least one partial document
             token_ids_changed_target = input_batch[0].clone()
             # We increment the token id on the changed index.
-            token_ids_changed_target[changed_target_index] = (token_ids_changed_target[0, changed_target_index] + 1) % args.padded_vocab_size
+            token_ids_changed_target[0, changed_target_index] = (token_ids_changed_target[0, changed_target_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] += 1
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] %= args.padded_vocab_size
@@ -192,7 +196,7 @@ class MyTestCase(unittest.TestCase):
             last_prefix_index = prefix_indices[0][0] - 1  # guaranteed to be positive as we avoid pathological case previously
             token_ids_changed_input = input_batch[0].clone()
             #  We increment the token id on the changed index.
-            token_ids_changed_input[changed_target_index] = (token_ids_changed_input[
+            token_ids_changed_input[0, changed_target_index] = (token_ids_changed_input[
                                                                  0, last_prefix_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] += 1
