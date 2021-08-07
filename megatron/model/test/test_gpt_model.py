@@ -60,9 +60,8 @@ class MyTestCase(unittest.TestCase):
     def setUpClass(cls) -> None:
         deepspeed.init_distributed()
 
-    def tearDown(self) -> None:
+    def setUp(self) -> None:
         # We reset all global variables
-        print("Tearing down args.")
         global _GLOBAL_ARGS
         global _GLOBAL_NUM_MICROBATCHES_CALCULATOR
         global _GLOBAL_TOKENIZER
