@@ -37,6 +37,9 @@ def get_default_args():
         "--lr-warmup-fraction": ".01",
         "--fp16": "",
 
+        "--attention-dropout": "0",
+        "--hidden-dropout": "0",
+
         # OUTPUT_ARGS
         "--log-interval": "10",
         "--save-interval": "500",
@@ -81,6 +84,7 @@ class MyTestCase(unittest.TestCase):
             tokenizer = get_tokenizer()
 
             model, _, _ = setup_model_and_optimizer(gpt_model_provider)
+            model = model[0]
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
@@ -123,8 +127,8 @@ class MyTestCase(unittest.TestCase):
         """
         command_args = get_default_args()
 
-        command_args["--prefix-lm"] = "",
-        command_args["--reset-attention-mask"] = "",
+        command_args["--prefix-lm"] = ""
+        command_args["--reset-attention-mask"] = ""
 
         with patch('sys.argv', flatten_arguments(command_args)):
             initialize_megatron()
@@ -132,6 +136,7 @@ class MyTestCase(unittest.TestCase):
             tokenizer = get_tokenizer()
 
             model, _, _ = setup_model_and_optimizer(prefix_lm_model_provider)
+            model = model[0]
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
@@ -141,7 +146,7 @@ class MyTestCase(unittest.TestCase):
 
             # process batch to have non empty prefix
             for i in range(9, -1, -1):
-                input_batch, _, prefix_indices = get_prefix_lm_batch_pipe(token_ids)
+                input_batch, _, prefix_indices = get_prefix_lm_batch_pipe({"text": token_ids})
                 if (prefix_indices[0][0] != 0):
                     break
                 if i == 0:
@@ -222,6 +227,7 @@ class MyTestCase(unittest.TestCase):
             tokenizer = get_tokenizer()
 
             model, _, _ = setup_model_and_optimizer(gpt_model_provider)
+            model = model[0]
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
 
@@ -230,7 +236,7 @@ class MyTestCase(unittest.TestCase):
             token_ids[token_ids == tokenizer.eod] %= args.padded_vocab_size
 
             # process batch
-            input_batch = get_gpt_batch_pipe(token_ids)[0]
+            input_batch = get_gpt_batch_pipe({"text": token_ids})[0]
 
             model(input_batch)
 
