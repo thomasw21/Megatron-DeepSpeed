@@ -2,8 +2,8 @@ import unittest
 from random import randint
 from unittest.mock import patch
 
+import deepspeed
 import torch
-from deepspeed import deepspeed
 
 from megatron import initialize_megatron, get_args, get_tokenizer
 from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
