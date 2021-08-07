@@ -1,4 +1,3 @@
-import argparse
 import unittest
 from random import randint
 from unittest.mock import patch
@@ -10,6 +9,7 @@ from megatron import initialize_megatron, get_args, get_tokenizer, global_vars
 from megatron.training import setup_model_and_optimizer
 from pretrain_gpt import model_provider as gpt_model_provider, get_batch_pipe as get_gpt_batch_pipe
 from pretrain_prefix_lm import model_provider as prefix_lm_model_provider, get_batch_pipe as get_prefix_lm_batch_pipe
+
 
 def get_default_args():
     """return a dictionary with key as argument name and value as additional arguments"""
@@ -50,6 +50,7 @@ def get_default_args():
         # DATA_ARGS
     }
 
+
 def flatten_arguments(args):
     """
     Converts dictionary argument to a list.
@@ -60,9 +61,11 @@ def flatten_arguments(args):
     """
     return ["IGNORED"] + [item for key_value in args.items() for item in key_value if item != ""]
 
-def equal_vectors(tensor1, tensor2, dim = -1):
+
+def equal_vectors(tensor1, tensor2, dim=-1):
     """View tensor1 and tensor2 as a list of vectors, and compute equality"""
     return torch.linalg.norm(tensor1 - tensor2, dim=dim) == 0
+
 
 class MyTestCase(unittest.TestCase):
     @classmethod
@@ -103,7 +106,8 @@ class MyTestCase(unittest.TestCase):
             changed_index = randint(0, args.seq_length - 2)
             input_token_ids_changed = input_batch[0].clone()
             # We increment the token_id by one for that index in order to artificially change the sequence.
-            input_token_ids_changed[:, changed_index] = (input_token_ids_changed[:, changed_index] + 1) % args.padded_vocab_size
+            input_token_ids_changed[:, changed_index] = (input_token_ids_changed[:,
+                                                         changed_index] + 1) % args.padded_vocab_size
 
             output = model(*input_batch)
             output_changed = model(input_token_ids_changed, *input_batch[1:])
@@ -113,10 +117,10 @@ class MyTestCase(unittest.TestCase):
                 torch.all(equal_vectors(output[:, :changed_index], output_changed[:, :changed_index]))
             )
             # All tokens in the future should have changed
+            print(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             self.assertFalse(
                 torch.any(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             )
-
 
     def test_gpt_prefix(self):
         """
@@ -157,10 +161,12 @@ class MyTestCase(unittest.TestCase):
 
             ## --------------- CHANGE A TARGET TOKEN ---------------------------
             # get a modified version of the first batch
-            changed_target_index = prefix_indices[0][0] # guaranteed to exist as each row has at least one partial document
+            changed_target_index = prefix_indices[0][
+                0]  # guaranteed to exist as each row has at least one partial document
             token_ids_changed_target = input_batch[0].clone()
             # We increment the token id on the changed index.
-            token_ids_changed_target[0, changed_target_index] = (token_ids_changed_target[0, changed_target_index] + 1) % args.padded_vocab_size
+            token_ids_changed_target[0, changed_target_index] = (token_ids_changed_target[
+                                                                     0, changed_target_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] += 1
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] %= args.padded_vocab_size
@@ -189,11 +195,12 @@ class MyTestCase(unittest.TestCase):
 
             ## --------------- CHANGE AN INPUT TOKEN ---------------------------
             # Let's change the the last prefix token and make sure that the first token changed
-            last_prefix_index = prefix_indices[0][0] - 1  # guaranteed to be positive as we avoid pathological case previously
+            last_prefix_index = prefix_indices[0][
+                                    0] - 1  # guaranteed to be positive as we avoid pathological case previously
             token_ids_changed_input = input_batch[0].clone()
             #  We increment the token id on the changed index.
             token_ids_changed_input[0, changed_target_index] = (token_ids_changed_input[
-                                                                 0, last_prefix_index] + 1) % args.padded_vocab_size
+                                                                    0, last_prefix_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] += 1
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] %= args.padded_vocab_size
@@ -212,7 +219,6 @@ class MyTestCase(unittest.TestCase):
                     equal_vectors(output[1, :], output_changed_input[1, :])
                 )
             )
-
 
     def test_gpt_rotary_embeddings(self):
         """Test rotary embeddings"""
@@ -240,10 +246,6 @@ class MyTestCase(unittest.TestCase):
 
             model(*input_batch)
 
-def get_deepspeed_args():
-    parser = argparse.ArgumentParser()
-    return deepspeed.add_config_arguments(parser)
 
 if __name__ == '__main__':
-    get_deepspeed_args()
     unittest.main()
