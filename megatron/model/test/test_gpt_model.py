@@ -106,8 +106,8 @@ class MyTestCase(unittest.TestCase):
             changed_index = randint(0, args.seq_length - 2)
             input_token_ids_changed = input_batch[0].clone()
             # We increment the token_id by one for that index in order to artificially change the sequence.
-            input_token_ids_changed[:, changed_index] = (input_token_ids_changed[:,
-                                                         changed_index] + 1) % args.padded_vocab_size
+            input_token_ids_changed[:, changed_index] = \
+                (input_token_ids_changed[:,changed_index] + 1) % args.padded_vocab_size
 
             output = model(*input_batch)
             output_changed = model(input_token_ids_changed, *input_batch[1:])
@@ -164,8 +164,8 @@ class MyTestCase(unittest.TestCase):
             changed_target_index = prefix_indices[0][0]
             token_ids_changed_target = input_batch[0].clone()
             # We increment the token id on the changed index.
-            token_ids_changed_target[0, changed_target_index] = (token_ids_changed_target[
-                                                                     0, changed_target_index] + 1) % args.padded_vocab_size
+            token_ids_changed_target[0, changed_target_index] = \
+                (token_ids_changed_target[0, changed_target_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] += 1
             token_ids_changed_target[token_ids_changed_target == tokenizer.eod] %= args.padded_vocab_size
@@ -198,8 +198,8 @@ class MyTestCase(unittest.TestCase):
             last_prefix_index = prefix_indices[0][0] - 1
             token_ids_changed_input = input_batch[0].clone()
             #  We increment the token id on the changed index.
-            token_ids_changed_input[0, changed_target_index] = (token_ids_changed_input[
-                                                                    0, last_prefix_index] + 1) % args.padded_vocab_size
+            token_ids_changed_input[0, last_prefix_index] = \
+                (token_ids_changed_input[0, last_prefix_index] + 1) % args.padded_vocab_size
             # make sure we're not changing a token to eod as it's a special token
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] += 1
             token_ids_changed_input[token_ids_changed_input == tokenizer.eod] %= args.padded_vocab_size
