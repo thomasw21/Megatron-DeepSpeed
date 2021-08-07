@@ -117,7 +117,6 @@ class MyTestCase(unittest.TestCase):
                 torch.all(equal_vectors(output[:, :changed_index], output_changed[:, :changed_index]))
             )
             # All tokens in the future should have changed
-            print(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             self.assertFalse(
                 torch.any(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             )
@@ -161,8 +160,8 @@ class MyTestCase(unittest.TestCase):
 
             ## --------------- CHANGE A TARGET TOKEN ---------------------------
             # get a modified version of the first batch
-            changed_target_index = prefix_indices[0][
-                0]  # guaranteed to exist as each row has at least one partial document
+            # guaranteed to exist as each row has at least one partial document
+            changed_target_index = prefix_indices[0][0]
             token_ids_changed_target = input_batch[0].clone()
             # We increment the token id on the changed index.
             token_ids_changed_target[0, changed_target_index] = (token_ids_changed_target[
@@ -195,8 +194,8 @@ class MyTestCase(unittest.TestCase):
 
             ## --------------- CHANGE AN INPUT TOKEN ---------------------------
             # Let's change the the last prefix token and make sure that the first token changed
-            last_prefix_index = prefix_indices[0][
-                                    0] - 1  # guaranteed to be positive as we avoid pathological case previously
+            # guaranteed to be positive as we avoid pathological case previously
+            last_prefix_index = prefix_indices[0][0] - 1
             token_ids_changed_input = input_batch[0].clone()
             #  We increment the token id on the changed index.
             token_ids_changed_input[0, changed_target_index] = (token_ids_changed_input[
@@ -208,6 +207,7 @@ class MyTestCase(unittest.TestCase):
             output_changed_input = model(token_ids_changed_input, *input_batch[1:])
 
             # All tokens should be changed
+            print(equal_vectors(output[0, :], output_changed_input[0, :]))
             self.assertFalse(
                 torch.any(
                     equal_vectors(output[0, :], output_changed_input[0, :])
