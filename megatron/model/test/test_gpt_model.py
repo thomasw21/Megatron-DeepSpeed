@@ -130,7 +130,6 @@ class MyTestCase(unittest.TestCase):
         """
         command_args = get_default_args()
 
-        command_args["--prefix-lm"] = ""
         command_args["--reset-attention-mask"] = ""
 
         with patch('sys.argv', flatten_arguments(command_args)):
