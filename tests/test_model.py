@@ -74,6 +74,8 @@ class MyTestCase(TestCasePlus):
         deepspeed.init_distributed()
 
     def setUp(self) -> None:
+        super().setUp()
+
         # We reset all global variables
         global_vars._GLOBAL_ARGS = None
         global_vars._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
@@ -132,6 +134,7 @@ class MyTestCase(TestCasePlus):
         command_args = get_default_args()
 
         command_args["--reset-attention-mask"] = ""
+        command_args["--loss-on-targets-only"] = ""
 
         with patch('sys.argv', flatten_arguments(command_args)):
             initialize_megatron()
