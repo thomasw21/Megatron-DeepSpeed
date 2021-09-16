@@ -241,15 +241,7 @@ class MyTestCase(TestCasePlus):
             model = model[0]
 
             token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
-
-            # process batch to have non empty prefix
-            for i in range(9, -1, -1):
-                input_batch, _, prefix_indices = get_prefix_lm_batch_pipe({"text": token_ids})
-                if (prefix_indices[0][0] != 0):
-                    break
-                if i == 0:
-                    # FIXME: find a better way to not obtain empty prefix
-                    raise ValueError("Could not obtain non pathological case where prefix is not empty")
+            input_batch, _, prefix_indices = get_prefix_lm_batch_pipe({"text": token_ids})
 
             model(*input_batch)
 
