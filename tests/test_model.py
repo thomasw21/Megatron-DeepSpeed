@@ -124,9 +124,9 @@ class MyTestCase(TestCasePlus):
                 torch.any(equal_vectors(output[:, changed_index:], output_changed[:, changed_index:]))
             )
 
-    def test_prefix_lm(self):
+    def test_prefix_lm_reset_attention_mask(self):
         """
-        Test prefix invariances:
+        Test prefix invariances when `reset_attention_mask=True`:
             - Past target tokens don't depend on future target tokens.
             - Target tokens depend on input tokens.
             - Input tokens depend on all other input tokens, but never target tokens.
@@ -210,7 +210,6 @@ class MyTestCase(TestCasePlus):
             output_changed_input = model(token_ids_changed_input, *input_batch[1:])
 
             # All tokens should be changed
-            print(equal_vectors(output[0, :], output_changed_input[0, :]))
             self.assertFalse(
                 torch.any(
                     equal_vectors(output[0, :], output_changed_input[0, :])
@@ -222,6 +221,39 @@ class MyTestCase(TestCasePlus):
                     equal_vectors(output[1, :], output_changed_input[1, :])
                 )
             )
+
+    def test_prefix_lm_wo_reset_attention_mask(self):
+        """
+        Test prefix invariances when `reset_attention_mask=False`:
+            - Past target tokens don't depend on future target tokens.
+            - Target tokens depend on input tokens.
+            - Input tokens depend on all other input tokens, but never target tokens.
+        """
+        command_args = get_default_args()
+
+        command_args["--loss-on-targets-only"] = ""
+
+        with patch('sys.argv', flatten_arguments(command_args)):
+            initialize_megatron()
+            args = get_args()
+
+            model, _, _ = setup_model_and_optimizer(prefix_lm_model_provider)
+            model = model[0]
+
+            token_ids = torch.randint(args.padded_vocab_size, (args.micro_batch_size, args.seq_length))
+
+            # process batch to have non empty prefix
+            for i in range(9, -1, -1):
+                input_batch, _, prefix_indices = get_prefix_lm_batch_pipe({"text": token_ids})
+                if (prefix_indices[0][0] != 0):
+                    break
+                if i == 0:
+                    # FIXME: find a better way to not obtain empty prefix
+                    raise ValueError("Could not obtain non pathological case where prefix is not empty")
+
+            model(*input_batch)
+
+            #TODO: Check all invariants
 
     def test_gpt_rotary_embeddings(self):
         """Test rotary embeddings"""
@@ -248,6 +280,8 @@ class MyTestCase(TestCasePlus):
             input_batch = get_gpt_batch_pipe({"text": token_ids})[0]
 
             model(*input_batch)
+
+            #TODO: Check all invariants
 
 
 if __name__ == '__main__':
